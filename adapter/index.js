@@ -1,4 +1,3 @@
-// A construct which adapts an existing interface X to conform to the required interface
 class Point {
   constructor(x, y) {
     this.x = x;
@@ -41,6 +40,61 @@ class VectorRectangle extends VectorObject {
 // ↑↑↑ this is your API ↑↑↑
 
 // ↓↓↓ this is what you have to work with ↓↓↓
+String.prototype.hashCode = function () {
+  if (Array.prototype.reduce) {
+    return this.split("").reduce(function (a, b) {
+      a = (a << 5) - a + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+  }
+  let hash = 0;
+  if (this.length === 0) return hash;
+  for (let i = 0; i < this.length; i++) {
+    const character = this.charCodeAt(i);
+    hash = (hash << 5) - hash + character;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash;
+};
+
+class LineToPointAdapter extends Array {
+  constructor(line) {
+    super();
+
+    this.hash = JSON.stringify(line).hashCode();
+    if (LineToPointAdapter.cache[this.hash]) return; // we already have it
+
+    console.log(
+      `${LineToPointAdapter.count++}: Generating ` +
+        `points for line ${line.toString()} (with caching)`
+    );
+
+    let points = [];
+
+    let left = Math.min(line.start.x, line.end.x);
+    let right = Math.max(line.start.x, line.end.x);
+    let top = Math.min(line.start.y, line.end.y);
+    let bottom = Math.max(line.start.y, line.end.y);
+
+    if (right - left === 0) {
+      for (let y = top; y <= bottom; ++y) {
+        points.push(new Point(left, y));
+      }
+    } else if (line.end.y - line.start.y === 0) {
+      for (let x = left; x <= right; ++x) {
+        points.push(new Point(x, top));
+      }
+    }
+
+    LineToPointAdapter.cache[this.hash] = points;
+  }
+
+  get items() {
+    return LineToPointAdapter.cache[this.hash];
+  }
+}
+LineToPointAdapter.count = 0;
+LineToPointAdapter.cache = {};
 
 let vectorObjects = [
   new VectorRectangle(1, 1, 10, 10),
@@ -51,41 +105,14 @@ let drawPoint = function (point) {
   process.stdout.write(".");
 };
 
-// ↓↓↓ to draw our vector objects, we need an adapter ↓↓↓
-
-class LineToPointAdapter extends Array {
-  constructor(line) {
-    super();
-    console.log(
-      `${LineToPointAdapter.count++}: Generating ` +
-        `points for line ${line.toString()} (no caching)`
-    );
-
-    let left = Math.min(line.start.x, line.end.x);
-    let right = Math.max(line.start.x, line.end.x);
-    let top = Math.min(line.start.y, line.end.y);
-    let bottom = Math.max(line.start.y, line.end.y);
-
-    if (right - left === 0) {
-      for (let y = top; y <= bottom; ++y) {
-        this.push(new Point(left, y)); // temporary objects
-      }
-    } else if (line.end.y - line.start.y === 0) {
-      for (let x = left; x <= right; ++x) {
-        this.push(new Point(x, top));
-      }
-    }
-  }
-}
-LineToPointAdapter.count = 0;
-
-let drawPoints = function () {
-  for (let vo of vectorObjects)
+let draw = function () {
+  for (let vo of vectorObjects) {
     for (let line of vo) {
       let adapter = new LineToPointAdapter(line);
-      adapter.forEach(drawPoint);
+      adapter.items.forEach(drawPoint);
     }
+  }
 };
 
-drawPoints();
-drawPoints();
+draw();
+draw();
